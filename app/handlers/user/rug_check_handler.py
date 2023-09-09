@@ -65,8 +65,9 @@ async def token_cmd_handler(message: Message, config: Config, bot: Bot):
                     f"18. <b>Tron (TRON) 🔗</b>\n"
                 )
                 await message.answer(msg)
+
     except Exception as e:
         await message.answer(
             "📵 <b> We're sorry, but the token you provided appears to be invalid or error appeared.\n Please try again later. </b>"
         )
-        logging.error(e)
+        logging.error(repr(e))

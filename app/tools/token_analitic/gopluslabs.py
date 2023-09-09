@@ -90,16 +90,31 @@ class GoPlusLabs:
     CH_BOOL = {"1": True, "0": False}
     MSG_BOOL = {"0": "✅", "1": "🚫"}
     CHECK_BOOL = {"1": "✅", "0": "🚫"}
+    QUICK_BOOL = {False: "✅", True: "🚫"}
+    QUICK_REVERSE = {True: "✅", False: "🚫"}
 
     def __init__(self):
         self.session = aiohttp.ClientSession()
         # Set the locale to the user's default locale
         self.locale = locale.setlocale(locale.LC_ALL, "")
 
-    async def aiohttp_get(self, url) -> dict:
+    async def aiohttp_get(self, url, headers={}) -> dict:
         start = time.time()
-        async with self.session.get(url) as response:
+        async with self.session.get(url, headers=headers) as response:
             data = await response.text()
+        parsed_data = json.loads(data)
+        print(time.time() - start)
+        return parsed_data
+
+    async def aiohttp_post(self, url, headers, data) -> dict:
+        print("post")
+        start = time.time()
+        print(1)
+        async with self.session.post(url, headers=headers, data=data) as response:
+            print(2)
+            print(response)
+            data = await response.text()
+        print(data)
         parsed_data = json.loads(data)
         print(time.time() - start)
         return parsed_data
@@ -188,6 +203,57 @@ class GoPlusLabs:
             count += 1
 
         return count
+    
+    async def check_quick_message(self, data) -> int:
+        count = 0
+        if (
+            self.QUICK_BOOL[data["data"]["is_Honeypot"]]
+            if data["data"].get("is_Honeypot")
+            else None
+        ):
+            count += 1
+        if (
+            self.QUICK_BOOL[data["data"]["is_Mintable"]]
+            if data["data"].get("is_Mintable")
+            else None
+        ):
+            count += 1
+        if (
+            self.QUICK_BOOL[data["data"]["is_Proxy"]]
+            if data["data"].get("is_proxy")
+            else None
+        ):
+            count += 1
+        if (
+            self.QUICK_BOOL[data["data"]["isBlacklisted"]]
+            if data["data"].get("is_Blacklisted")
+            else None
+        ):
+            count += 1
+        if (
+            self.QUICK_REVERSE[data["data"]["contract_Verified"]]
+            if data["data"].get("contract_Verified")
+            else None
+        ):
+            count += 1
+        count += 1
+        return count
+
+    async def get_quick_message(self, data):
+        try:
+            count = await self.check_quick_message(data)
+            return (
+                f"<b>🛡️Safety Test's</b>\n\n"
+                f"<b>🍯Honeypot: </b> {self.QUICK_BOOL[data['data']['is_Honeypot']] if data['data'].get('is_Honeypot') else self.QUICK_BOOL[False]}    "
+                f"<b>🖨️Mintable: </b> {self.QUICK_BOOL[data['data']['is_Mintable']] if data['data'].get('is_Mintable') else self.QUICK_BOOL[False]}\n"
+                f"<b>🔄Proxy: </b> {self.QUICK_BOOL[data['data']['is_Proxy']] if data['data'].get('is_Proxy') else self.QUICK_BOOL[False]}           "
+                f"<b>🚫Blacklisted: </b> {self.QUICK_BOOL[data['data']['is_Blacklisted']] if data['data'].get('is_Blacklisted') else self.QUICK_BOOL[False]}\n"
+                f"<b>📈In Dex: </b> {self.QUICK_BOOL[data['data']['is_in_dex']] if data['data'].get('is_in_dex') else self.QUICK_BOOL[True]}          "
+                f"<b>🌐Contract Verified: </b> {self.QUICK_REVERSE[data['data']['contract_Verified']] if data['data'].get('contract_Verified') else self.QUICK_REVERSE[False]}\n\n"
+                f"🧪 <b>{count}/6 Test's passed</b> 🧪\n\n"
+            )
+        except:
+            return ""
 
     async def get_message_analytic(self, data):
         try:
@@ -203,8 +269,8 @@ class GoPlusLabs:
                 f"🧪 <b>{count}/6 Test's passed</b> 🧪\n\n"
             )
         except:
-            return "🍯 Test: DOES NOT SEEM LIKE HONEYPOT\n\n"
-
+            return await self.get_quick_message(data)
+        
     async def calculate_age(self, data):
         try:
             current_time = datetime.utcnow()
@@ -253,7 +319,7 @@ class GoPlusLabs:
         else:
             url = None
         if data.get('data'):
-            if data['data']['holders']:
+            if data['data'].get('holders'):
                 msg = "<b>Top Holders: </b>"
                 for holder in data['data']['holders']:
                     if url is not None:
@@ -371,6 +437,26 @@ class GoPlusLabs:
             return f"<b>Pair: </b> {pair} \n"
         except:
             return ""
+
+    async def quickintel_audit(self, data, address):
+        try:
+            import json
+            headers = {
+                "api_key": "0xs-KUen48jjdHV223ss"
+            }
+            payload = {
+                "chain": data['base']['identifier'],
+                "tokenAddress": address,
+                "id": "Oxs"
+            }
+            url = "https://qpi.quickintel.io/api/getthirdaudit"
+            print(url) 
+            response = await self.aiohttp_post(url, headers, json.dumps(payload)) 
+            print(response)
+            data['data'] = response
+            return data
+        except:
+            return data
 
     async def get_message(self, data, bot, address) -> str:
         ads = await ads_manager.get_ads(bot)
@@ -499,6 +585,8 @@ class GoPlusLabs:
             data = await self.get_gecko_full_info(address, data)
             if data["base"]["identifier"] != "shibarium":
                 data = await self.get_token_security_info(data, address)
+            else:
+                data = await self.quickintel_audit(data, address)
             keyboards = await self.get_button_links(data, address)
             msg = await self.get_message(data, bot, address)
             return msg, keyboards
